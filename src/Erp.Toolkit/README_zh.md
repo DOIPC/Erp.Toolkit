@@ -1,6 +1,6 @@
 # Erp.Toolkit
 
-[![License](https://img.shields.io/github/license/zhangsanbin/Erp.Toolkit?color=97ca00)](./LICENSE)
+[![License](https://img.shields.io/github/license/zhangsanbin/Erp.Toolkit)](./LICENSE)
 [![Docker](https://img.shields.io/badge/docker-latest-0db7ed?logo=docker)](https://hub.docker.com/r/doipc/erpwebapi)
 [![GitHub commit activity](https://img.shields.io/github/commit-activity/y/zhangsanbin/Erp.Toolkit?color=fe7d37)](https://github.com/zhangsanbin/Erp.Toolkit)
 [![Pulls](https://img.shields.io/docker/pulls/doipc/erpwebapi?color=6f42c1)](https://hub.docker.com/r/doipc/erpwebapi)
