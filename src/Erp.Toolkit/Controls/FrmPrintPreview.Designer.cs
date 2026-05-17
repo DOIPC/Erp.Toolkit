@@ -61,6 +61,7 @@
             this.pageSetupDialog = new System.Windows.Forms.PageSetupDialog();
             this.printDialog = new System.Windows.Forms.PrintDialog();
             this.printDocument = new System.Drawing.Printing.PrintDocument();
+            this.button_Close = new System.Windows.Forms.Button();
             this.toolStrip.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -336,14 +337,27 @@
             // 
             this.printDocument.DocumentName = "打印预览";
             // 
+            // button_Close
+            // 
+            this.button_Close.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            this.button_Close.Location = new System.Drawing.Point(702, 171);
+            this.button_Close.Name = "button_Close";
+            this.button_Close.Size = new System.Drawing.Size(75, 23);
+            this.button_Close.TabIndex = 2;
+            this.button_Close.Text = "Close";
+            this.button_Close.UseVisualStyleBackColor = true;
+            this.button_Close.Click += new System.EventHandler(this.button_Close_Click);
+            // 
             // FrmPrintPreview
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(188)))), ((int)(((byte)(206)))), ((int)(((byte)(230)))));
+            this.CancelButton = this.button_Close;
             this.ClientSize = new System.Drawing.Size(1264, 861);
             this.Controls.Add(this.printPreviewControl);
             this.Controls.Add(this.toolStrip);
+            this.Controls.Add(this.button_Close);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MinimizeBox = false;
             this.Name = "FrmPrintPreview";
@@ -391,5 +405,6 @@
         private System.Windows.Forms.ToolStripMenuItem toolStripMenuItem_displayScaleAuto;
         private System.Windows.Forms.ToolStripMenuItem toolStripMenuItem_displayScale150;
         private System.Windows.Forms.ToolStripMenuItem toolStripMenuItem_displayScale200;
+        private System.Windows.Forms.Button button_Close;
     }
 }

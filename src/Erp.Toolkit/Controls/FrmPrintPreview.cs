@@ -7,6 +7,7 @@
  * Date                 Author      Notes
  * 2024-04-03           Andy        the first version
  * 2025-07-16           Andy        Split, restructure
+ * 2026-05-17           Andy        Direct print (no dialog) silent printing
  */
 
 using Erp.Toolkit.Localization;
@@ -75,9 +76,14 @@ namespace Erp.Toolkit.Controls
             Text = printDocument.DocumentName.ToString() + "（" + localizer.GetString("PrintPreview") + "）";
         }
 
+        /// <summary>
+        /// 选择打印机
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void toolStripButton_SelectPrinter_Click(object sender, EventArgs e)
         {
-            if (printDialog.ShowDialog() == DialogResult.OK)
+            if (printDialog.ShowDialog(this) == DialogResult.OK)
             {
                 // 强制刷新
                 printPreviewControl.Document = null;
@@ -85,9 +91,14 @@ namespace Erp.Toolkit.Controls
             }
         }
 
+        /// <summary>
+        /// 页面设置
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void toolStripButton_PageSetup_Click(object sender, EventArgs e)
         {
-            if (pageSetupDialog.ShowDialog() == DialogResult.OK)
+            if (pageSetupDialog.ShowDialog(this) == DialogResult.OK)
             {
                 // 获取并显示用户设置的页边距
                 Margins margins = pageSetupDialog.PageSettings.Margins;
@@ -102,12 +113,15 @@ namespace Erp.Toolkit.Controls
             }
         }
 
+        /// <summary>
+        /// 打印
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void toolStripButton_Print_Click(object sender, EventArgs e)
         {
-            if (printDialog.ShowDialog() == DialogResult.OK)
-            {
-                printDocument.Print();
-            }
+            // 直接打印
+            printDocument.Print();
         }
 
         private void toolStripButton_OnePage_Click(object sender, EventArgs e)
@@ -293,6 +307,11 @@ namespace Erp.Toolkit.Controls
         }
 
         private void toolStripButton_Close_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+
+        private void button_Close_Click(object sender, EventArgs e)
         {
             this.Close();
         }
