@@ -9,7 +9,7 @@
     
     <!-- NuGet 包属性 -->
     <PackageId>Erp.Toolkit</PackageId>
-    <Version>0.5.3</Version>
+    <Version>0.5.4</Version>
     <Authors>Sanbin</Authors>
     <Title>Erp Toolkit</Title>
     <PackageIcon>erp.toolkit.logo.png</PackageIcon>
