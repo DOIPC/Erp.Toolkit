@@ -289,11 +289,26 @@ docker run --name ${API_CONTAINER} \
     -d ${API_IMAGE}
 
 if [ $? -eq 0 ]; then
+
+    # ---------- 获取宿主机局域网 IP ----------
+    # 优先使用默认路由的 src 地址，避免取到 docker 网桥 IP
+    HOST_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="src") {print $(i+1); exit}}')
+    # 如果获取失败，退回使用 hostname -I 的第一个地址
+    if [ -z "$HOST_IP" ]; then
+        HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+    fi
+
     echo "========================================="
     echo -e "  ${GREEN}✅ 全部部署成功！${NC}"
     echo "  ● 网络: ${NETWORK}"
     echo "  ● 数据库: ${DB_TYPE} (容器 ${DB_CONTAINER}，端口 ${DB_PORT_HOST}，数据目录 ${DB_VOLUME_HOST})"
-    echo "  ● WebAPI: 容器 ${API_CONTAINER}，访问 http://localhost:${API_HOST_PORT}"
+    echo "  ● WebAPI: 容器 ${API_CONTAINER}"
+    echo "      - 本机访问:        http://localhost:${API_HOST_PORT}"
+    if [ -n "$HOST_IP" ]; then
+        echo "      - 局域网/对外IP:   http://${HOST_IP}:${API_HOST_PORT}"
+    else
+        echo "      - 未获取到宿主机 IP，请手动检查网络配置"
+    fi
     echo "  ● 上传目录: ${UPLOAD_HOST_DIR}（挂载到容器内 /userData）"
     echo "  ● 容器以用户 $(id -u):$(id -g) 运行，因此拥有目录写入权限"
     echo "  ● JWT 密钥: 已注入（未显示）"
