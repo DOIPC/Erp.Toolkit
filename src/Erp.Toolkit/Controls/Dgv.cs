@@ -7,6 +7,7 @@
  * Date                 Author      Notes
  * 2024-04-03           Andy        the first version
  * 2025-07-13           Andy        Split, restructure
+ * 2026-08-23           Andy        Add UTC to local time conversion for DataGridView display and printing.
  */
 
 using Erp.Toolkit.Localization;
@@ -120,6 +121,9 @@ namespace Erp.Toolkit.Controls
 
             // 根据事件绑定情况，设置按钮状态
             UpdateButtonState();
+
+            // 初始化 UTC 转换事件绑定
+            UpdateUtcConversionBinding();
         }
 
         #region 字段
@@ -879,6 +883,20 @@ namespace Erp.Toolkit.Controls
                     DateTime dateValue = (DateTime)cellValue;
                     menuVisibleValue = dateValue.ToString("yyyy-MM-dd");
                     _columnValueType = "dateTime";
+                }
+                else if (cellType == typeof(DateTimeOffset))
+                {
+                    // 单元格包含 UTC 日期（处理逻辑待完善）
+                    ToolStripMenuItem_findText.Visible = false;
+                    ToolStripMenuItem_findNubmer.Visible = false;
+                    ToolStripMenuItem_findDate.Visible = true;
+                    ToolStripMenuItem_Like.Visible = false;
+                    ToolStripMenuItem_NotLike.Visible = false;
+
+                    // 菜单显示文本
+                    DateTimeOffset dateValue = (DateTimeOffset)cellValue;
+                    menuVisibleValue = dateValue.ToString("yyyy-MM-dd");
+                    _columnValueType = "dateTimeOffset";
                 }
                 else if (cellType == typeof(int) || cellType == typeof(long) || cellType == typeof(float) || cellType == typeof(double) || cellType == typeof(decimal))
                 {
@@ -2209,8 +2227,11 @@ namespace Erp.Toolkit.Controls
 
                 foreach (DataGridViewRow selectedRow in reversedSelectedRows)
                 {
-                    // 添加单元格的值，如果为空则添加空字符串，并用制表符分隔单元格
-                    sb.Append(selectedRow.Cells[_columnIndex].Value?.ToString() ?? string.Empty).Append("\t");
+                    // sb.Append(selectedRow.Cells[_columnIndex].Value?.ToString() ?? string.Empty).Append("\t");
+
+                    // 2026-08-23 Andy：使用统一的格式化方法，确保复制内容与显示/打印一致
+                    string cellText = FormatUtcCellValue(selectedRow.Cells[_columnIndex].Value);
+                    sb.Append(cellText).Append("\t");
 
                     // 移除最后一个制表符并添加换行符
                     if (sb.Length > 0)

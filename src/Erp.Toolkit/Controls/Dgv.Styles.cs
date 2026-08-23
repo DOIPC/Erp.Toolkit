@@ -7,6 +7,7 @@
  * Date                 Author      Notes
  * 2024-04-03           Andy        the first version
  * 2025-07-13           Andy        Split, restructure
+ * 2026-08-23           Andy        Add UTC to local time conversion for DataGridView display
  */
 
 using System;
@@ -394,6 +395,7 @@ namespace Erp.Toolkit.Controls
             // 单元格样式事件处理程序
             _cachedCellFormattingHandler = (sender, e) =>
             {
+                // 条件样式处理
                 var columnName = dataGridView.Columns[e.ColumnIndex].Name;
                 if (cellConfigDict.TryGetValue(columnName, out var columnConfigs))
                 {
@@ -931,6 +933,142 @@ namespace Erp.Toolkit.Controls
         }
 
         #endregion 条件样式外观
+
+        #region UTC转换本地时间显示
+
+        private bool _autoConvertUtcToLocal = true;
+        private DataGridViewCellFormattingEventHandler _cachedUtcConversionHandler;
+
+        /// <summary>
+        /// 是否自动将 UTC 时间（DateTimeOffset / DateTime.Utc）转换为本地时间显示
+        /// </summary>
+        public bool AutoConvertUtcToLocal
+        {
+            get => _autoConvertUtcToLocal;
+            set
+            {
+                if (_autoConvertUtcToLocal != value)
+                {
+                    _autoConvertUtcToLocal = value;
+
+                    // 更新绑定事件处理程序
+                    UpdateUtcConversionBinding();
+                }
+            }
+        }
+
+        // 默认不解析字符串，避免误转换和性能损耗
+        private bool _autoConvertUtcStringToLocal = false;
+        /// <summary>
+        /// 是否尝试将字符串形式的 UTC 时间转换为本地时间显示。
+        /// 启用后，单元格值为字符串时会尝试解析为 DateTimeOffset，若成功则转换。
+        /// 默认关闭，防止非时间字符串被错误解析或影响性能。
+        /// </summary>
+        public bool AutoConvertUtcStringToLocal
+        {
+            get => _autoConvertUtcStringToLocal;
+            set
+            {
+                if (_autoConvertUtcStringToLocal != value)
+                {
+                    _autoConvertUtcStringToLocal = value;
+                }
+            }
+        }
+
+        private string _utcLocalTimeFormat = "yyyy-MM-dd HH:mm:ss";
+        /// <summary>
+        /// 本地时间的显示格式，默认 "yyyy-MM-dd HH:mm:ss"
+        /// </summary>
+        public string UtcLocalTimeFormat
+        {
+            get => _utcLocalTimeFormat;
+            set => _utcLocalTimeFormat = value;
+        }
+
+        /// <summary>
+        /// 更新 UTC 转换事件绑定，根据 AutoConvertUtcToLocal 的值添加或移除 CellFormatting 事件处理程序
+        /// </summary>
+        private void UpdateUtcConversionBinding()
+        {
+            if (dataGridView == null) return; // 控件尚未创建，稍后处理
+
+            if (_autoConvertUtcToLocal)
+            {
+                if (_cachedUtcConversionHandler == null)
+                {
+                    _cachedUtcConversionHandler = HandleUtcConversion;
+                }
+                // 避免重复绑定
+                dataGridView.CellFormatting -= _cachedUtcConversionHandler;
+                dataGridView.CellFormatting += _cachedUtcConversionHandler;
+            }
+            else
+            {
+                if (_cachedUtcConversionHandler != null)
+                {
+                    dataGridView.CellFormatting -= _cachedUtcConversionHandler;
+                    // 可选择保留处理程序引用，或置为 null 以便重新创建
+                    // _cachedUtcConversionHandler = null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 根据 AutoConvertUtcToLocal 等设置，将单元格值格式化为最终显示文本。
+        /// 用于显示事件（CellFormatting）和打印绘制。
+        /// </summary>
+        private string FormatUtcCellValue(object value)
+        {
+            // 未启用转换时，直接返回默认字符串
+            if (!_autoConvertUtcToLocal)
+                return value?.ToString() ?? string.Empty;
+
+            // DateTimeOffset 转为本地时间
+            if (value is DateTimeOffset dto)
+            {
+                return dto.ToLocalTime().ToString(_utcLocalTimeFormat);
+            }
+
+            // UTC DateTime 转为本地时间
+            if (value is DateTime dt && dt.Kind == DateTimeKind.Utc)
+            {
+                return dt.ToLocalTime().ToString(_utcLocalTimeFormat);
+            }
+
+            // 字符串形式的 UTC 时间（需显式启用）
+            if (_autoConvertUtcStringToLocal && value is string str && !string.IsNullOrWhiteSpace(str))
+            {
+                if (DateTimeOffset.TryParse(str, out var dtoFromStr))
+                {
+                    return dtoFromStr.ToLocalTime().ToString(_utcLocalTimeFormat);
+                }
+            }
+
+            // 其他情况返回默认字符串
+            return value?.ToString() ?? string.Empty;
+        }
+
+        /// <summary>
+        /// 处理 DataGridView 的 CellFormatting 事件，将 UTC 时间转换为本地时间显示
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void HandleUtcConversion(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (!_autoConvertUtcToLocal) return;
+
+            string formatted = FormatUtcCellValue(e.Value);
+
+            // 如果格式化结果与原始值不同（即发生了转换），则应用格式化
+            if (!string.Equals(formatted, e.Value?.ToString(), StringComparison.Ordinal))
+            {
+                e.Value = formatted;
+                e.FormattingApplied = true;
+            }
+        }
+
+        #endregion UTC转换本地时间显示
 
         #region 自定义字段外观
 

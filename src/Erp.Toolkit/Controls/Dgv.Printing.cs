@@ -10,6 +10,7 @@
  * 2025-12-11           Andy        Code refactoring for better maintainability
  * 2025-12-15           Andy        Allocate the remaining space to the last column
  * 2025-12-16           Andy        Add footer with page numbers
+ * 2026-08-23           Andy        Add UTC to local time conversion for DataGridView display and printing.
  */
 
 using System;
@@ -513,7 +514,11 @@ namespace Erp.Toolkit.Controls
                         })
                         {
                             // 绘制单元格文本
-                            var cellText = cell.Value?.ToString() ?? string.Empty;
+                            // var cellText = cell.Value?.ToString() ?? string.Empty;
+
+                            // 2026-08-23 Andy：使用统一的格式化方法，使打印输出与应用显示一致
+                            // UTC 值被转换为本地时间
+                            string cellText = FormatUtcCellValue(cell.Value);
                             graphics.DrawString(cellText, dataGridView.Font, Brushes.Black, cellRect, stringFormat);
                         }
                     }

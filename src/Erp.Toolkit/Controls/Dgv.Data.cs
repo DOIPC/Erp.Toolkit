@@ -9,6 +9,7 @@
  * 2025-07-13           Andy        Split, restructure
  * 2025-11-08           Andy        SortDataGridView private to public, allow external calls
  * 2025-12-01           Andy        Fixed an issue where multilingual localization required display; now compatible with .NET Framework 4.6.2 and above.
+ * 2026-08-23           Andy        Convert the DateTimeOffset column in a DataTable to DateTime type.
  */
 
 using System;
@@ -57,6 +58,9 @@ namespace Erp.Toolkit.Controls
 
                 // 对象转换
                 DataTable table = ConvertToDataTable(items);
+
+                // 自动转换 DateTimeOffset 列为 DateTime（本地时间）
+                ConvertDateTimeOffsetColumnsToDateTime(table);
 
                 // 创建一个 DataView 并设置排序条件
                 _dataView = new DataView(table);
@@ -124,11 +128,15 @@ namespace Erp.Toolkit.Controls
                     return;
                 }
 
+                // 克隆一份，避免修改外部传入的 DataTable
+                DataTable tableForBinding = table.Copy();
+                ConvertDateTimeOffsetColumnsToDateTime(tableForBinding);
+
                 // 封装数据源
                 _bindingSource = new BindingSource();
 
                 // 创建一个 DataView 并设置排序条件
-                _dataView = new DataView(table);
+                _dataView = new DataView(tableForBinding);
 
                 // 将排序后的，数据源绑定
                 _bindingSource.DataSource = _dataView;
@@ -596,6 +604,9 @@ namespace Erp.Toolkit.Controls
             // 对象转换
             DataTable table = ConvertToDataTable(items);
 
+            // 自动转换 DateTimeOffset 列为 DateTime（本地时间）
+            ConvertDateTimeOffsetColumnsToDateTime(table);  
+
             // 数据源绑定
             _subviewBindingSource.DataSource = table;
 
@@ -640,8 +651,12 @@ namespace Erp.Toolkit.Controls
             // 封装数据源
             _subviewBindingSource = new BindingSource();
 
+            // 克隆一份，避免修改外部传入的 DataTable
+            DataTable tableForBinding = table.Copy();
+            ConvertDateTimeOffsetColumnsToDateTime(tableForBinding);
+
             // 数据源绑定
-            _subviewBindingSource.DataSource = table;
+            _subviewBindingSource.DataSource = tableForBinding;
 
             // 设置 DGV 数据源
             subview.dataGridView.DataSource = _subviewBindingSource;
@@ -664,5 +679,72 @@ namespace Erp.Toolkit.Controls
         }
 
         #endregion 从数据
+
+        #region 数据转换
+
+        /// <summary>
+        /// 将 DataTable 中的 DateTimeOffset 列转换为 DateTime 类型
+        /// 根据 AutoConvertUtcToLocal 设置决定转换为本地时间或 UTC 时间
+        /// 保持列名和原始列顺序不变
+        /// </summary>
+        private void ConvertDateTimeOffsetColumnsToDateTime(DataTable table)
+        {
+            if (table == null) return;
+
+            // 找出所有需要转换的 DateTimeOffset 列
+            var columnsToConvert = table.Columns.Cast<DataColumn>()
+                .Where(c => c.DataType == typeof(DateTimeOffset))
+                .ToList();
+
+            foreach (var oldCol in columnsToConvert)
+            {
+                string colName = oldCol.ColumnName;
+                int ordinal = oldCol.Ordinal;
+                bool allowDBNull = oldCol.AllowDBNull;
+                string caption = oldCol.Caption;
+                object defaultValue = oldCol.DefaultValue;
+
+                // 1. 暂存旧列数据
+                var tempData = new object[table.Rows.Count];
+                for (int i = 0; i < table.Rows.Count; i++)
+                {
+                    tempData[i] = table.Rows[i][oldCol];
+                }
+
+                // 2. 移除旧列（此时列名释放，可以添加同名新列）
+                table.Columns.Remove(oldCol);
+
+                // 3. 创建新列（类型为 DateTime）
+                DataColumn newCol = new DataColumn(colName, typeof(DateTime))
+                {
+                    AllowDBNull = allowDBNull,
+                    Caption = caption,
+                    DefaultValue = defaultValue is DateTimeOffset dtoDefault
+                        ? (_autoConvertUtcToLocal ? dtoDefault.LocalDateTime : dtoDefault.UtcDateTime)
+                        : defaultValue
+                };
+                table.Columns.Add(newCol);
+
+                // 4. 调整新列到原始位置
+                newCol.SetOrdinal(ordinal);
+
+                // 5. 填充转换后的数据
+                for (int i = 0; i < table.Rows.Count; i++)
+                {
+                    if (tempData[i] != DBNull.Value && tempData[i] is DateTimeOffset dtoValue)
+                    {
+                        table.Rows[i][newCol] = _autoConvertUtcToLocal
+                            ? dtoValue.LocalDateTime
+                            : dtoValue.UtcDateTime;
+                    }
+                    else
+                    {
+                        table.Rows[i][newCol] = DBNull.Value;
+                    }
+                }
+            }
+        }
+
+        #endregion 数据转换
     }
 }
