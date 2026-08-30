@@ -1041,7 +1041,14 @@ namespace Erp.Toolkit.Controls
             {
                 if (DateTimeOffset.TryParse(str, out var dtoFromStr))
                 {
-                    return dtoFromStr.ToLocalTime().ToString(_utcLocalTimeFormat);
+                    // 判断原始字符串是否携带UTC标识：Z 或者 末尾带 ±hh:mm 时区偏移，兼容末尾多余空格
+                    // 正则性能较低
+                    bool isUtcString = System.Text.RegularExpressions.Regex.IsMatch(str, @"([+-]\d{1,2}:\d{2}|Z)\s*$",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (isUtcString)
+                    {
+                        return dtoFromStr.ToLocalTime().ToString(_utcLocalTimeFormat);
+                    }
                 }
             }
 
