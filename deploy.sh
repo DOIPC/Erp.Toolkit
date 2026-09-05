@@ -36,6 +36,12 @@ MSSQL_PORT_HOST="1433"
 MSSQL_PORT_CONTAINER="1433"
 MSSQL_DB_NAME="erp"
 
+# phpMyAdmin (仅在 MySQL 分支可选)
+PMA_CONTAINER="phpMyAdmin"
+PMA_IMAGE="phpmyadmin:latest"
+PMA_PORT_HOST="8081"
+PMA_PORT_CONTAINER="80"
+
 # WebAPI
 API_CONTAINER="Erp.WebAPI"
 API_IMAGE="doipc/erpwebapi:latest"
@@ -75,6 +81,9 @@ if [ -z "$DB_CHOICE" ]; then
     DB_CHOICE=1
     echo -e "${YELLOW}  ⏰ 超时未输入，自动选择 PostgreSQL${NC}"
 fi
+
+# 初始化 phpMyAdmin 安装标志为 false
+PMA_INSTALLED=false
 
 case $DB_CHOICE in
     1)
@@ -242,6 +251,52 @@ case $DB_TYPE in
         ;;
 esac
 
+# ---- 7.5 如果是 MySQL 分支，询问是否安装 phpMyAdmin ----
+if [ "$DB_TYPE" = "mysql" ]; then
+    echo -e "${YELLOW}[7.5/10] 是否安装 phpMyAdmin 管理界面？${NC}"
+    echo "  默认不安装，30秒内无输入自动跳过。"
+    read -t 30 -p "是否安装 phpMyAdmin? [y/N]: " PMA_INPUT || true
+
+    if [ -n "$PMA_INPUT" ]; then
+        case "$PMA_INPUT" in
+            [yY]|[yY][eE][sS])
+                echo -e "  ${YELLOW}  开始安装 phpMyAdmin...${NC}"
+                # 清理旧 phpMyAdmin 容器（若存在）
+                OLD_PMA=$(docker ps -a -q -f name=^${PMA_CONTAINER}$)
+                if [ -n "$OLD_PMA" ]; then
+                    echo "  → 发现旧 phpMyAdmin 容器 (ID: ${OLD_PMA})，正在停止并删除..."
+                    docker stop ${OLD_PMA} 2>/dev/null || true
+                    docker rm ${OLD_PMA} 2>/dev/null || true
+                    echo -e "  ${GREEN}✅ 旧 phpMyAdmin 容器已删除${NC}"
+                else
+                    echo -e "  ℹ️  未找到名为 ${PMA_CONTAINER} 的容器"
+                fi
+
+                # 启动新 phpMyAdmin 容器
+                docker run --name ${PMA_CONTAINER} \
+                    --network ${NETWORK} \
+                    -e PMA_HOST=${DB_CONTAINER} \
+                    -e PMA_PORT=${DB_PORT_CONTAINER} \
+                    -p ${PMA_PORT_HOST}:${PMA_PORT_CONTAINER} \
+                    -d ${PMA_IMAGE}
+
+                if [ $? -eq 0 ]; then
+                    echo -e "  ${GREEN}✅ phpMyAdmin 已启动（端口: ${PMA_PORT_HOST}）${NC}"
+                    PMA_INSTALLED=true
+                else
+                    echo -e "  ${RED}❌ phpMyAdmin 启动失败，请检查错误信息。${NC}"
+                    # 不退出，继续后续步骤
+                fi
+                ;;
+            *)
+                echo -e "  ${GREEN}✅ 跳过 phpMyAdmin 安装。${NC}"
+                ;;
+        esac
+    else
+        echo -e "  ${YELLOW}  ⏰ 超时未输入，自动跳过 phpMyAdmin 安装。${NC}"
+    fi
+fi
+
 # ---- 8. 清理旧 WebAPI 容器 ----
 echo -e "${YELLOW}[8/10] 清理旧的 WebAPI 容器...${NC}"
 OLD_API=$(docker ps -a -q -f name=^${API_CONTAINER}$)
@@ -290,6 +345,36 @@ docker run --name ${API_CONTAINER} \
 
 if [ $? -eq 0 ]; then
 
+    # ---------- 询问是否设置开机自启 ----------
+    echo -e "${YELLOW}[可选] 是否将已安装的容器设置为开机自动启动？${NC}"
+    echo "  默认不设置（容器不会随 Docker 服务自动启动）。"
+    echo "  若选择是，将对数据库、WebAPI 以及可能的 phpMyAdmin 设置 --restart unless-stopped。"
+    read -t 30 -p "设置开机自启? [y/N]: " RESTART_INPUT || true
+
+    if [ -n "$RESTART_INPUT" ]; then
+        case "$RESTART_INPUT" in
+            [yY]|[yY][eE][sS])
+                echo -e "  ${YELLOW}  正在设置自动重启策略...${NC}"
+                # 数据库容器
+                docker update --restart unless-stopped ${DB_CONTAINER} >/dev/null
+                echo -e "  ${GREEN}✅ 已设置 ${DB_CONTAINER} 自动重启${NC}"
+                # WebAPI 容器
+                docker update --restart unless-stopped ${API_CONTAINER} >/dev/null
+                echo -e "  ${GREEN}✅ 已设置 ${API_CONTAINER} 自动重启${NC}"
+                # 如果安装了 phpMyAdmin，也设置
+                if [ "$PMA_INSTALLED" = true ]; then
+                    docker update --restart unless-stopped ${PMA_CONTAINER} >/dev/null
+                    echo -e "  ${GREEN}✅ 已设置 ${PMA_CONTAINER} 自动重启${NC}"
+                fi
+                ;;
+            *)
+                echo -e "  ${GREEN}✅ 未设置自动重启，容器将保持默认策略。${NC}"
+                ;;
+        esac
+    else
+        echo -e "  ${YELLOW}  ⏰ 超时未输入，默认不设置自动重启。${NC}"
+    fi
+
     # ---------- 获取宿主机局域网 IP ----------
     # 优先使用默认路由的 src 地址，避免取到 docker 网桥 IP
     HOST_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="src") {print $(i+1); exit}}')
@@ -312,14 +397,28 @@ if [ $? -eq 0 ]; then
     echo "  ● 上传目录: ${UPLOAD_HOST_DIR}（挂载到容器内 /userData）"
     echo "  ● 容器以用户 $(id -u):$(id -g) 运行，因此拥有目录写入权限"
     echo "  ● JWT 密钥: 已注入（未显示）"
+
+    # MySQL 分支的 phpMyAdmin 信息
     if [ "$DB_TYPE" = "mysql" ]; then
-        echo "  💡 可选的 phpMyAdmin 管理界面（如需要，请手动执行）："
-        echo "     docker run --name phpMyAdmin --network=${NETWORK} -e PMA_HOST=${DB_CONTAINER} -e PMA_PORT=${DB_PORT_CONTAINER} -p 8081:80 -d phpmyadmin:latest"
+        if [ "$PMA_INSTALLED" = true ]; then
+            echo "  ● phpMyAdmin: 容器 ${PMA_CONTAINER}"
+            echo "      - 访问地址:        http://localhost:${PMA_PORT_HOST}"
+            if [ -n "$HOST_IP" ]; then
+                echo "      - 局域网/对外IP:   http://${HOST_IP}:${PMA_PORT_HOST}"
+            fi
+        else
+            echo "  💡 可选的 phpMyAdmin 管理界面（如需要，请手动执行）："
+            echo "     docker run --name ${PMA_CONTAINER} --network=${NETWORK} -e PMA_HOST=${DB_CONTAINER} -e PMA_PORT=${DB_PORT_CONTAINER} -p ${PMA_PORT_HOST}:${PMA_PORT_CONTAINER} -d ${PMA_IMAGE}"
+        fi
     fi
+
     echo "========================================="
     echo "  查看日志:"
     echo "    docker logs -f ${DB_CONTAINER}"
     echo "    docker logs -f ${API_CONTAINER}"
+    if [ "$PMA_INSTALLED" = true ]; then
+        echo "    docker logs -f ${PMA_CONTAINER}"
+    fi
     echo "  进入容器:"
     echo "    docker exec -it ${API_CONTAINER} /bin/bash"
 else
